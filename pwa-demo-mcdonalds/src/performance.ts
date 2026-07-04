@@ -119,7 +119,13 @@ const PRESETS: Record<PerformanceTier, PerformancePreset> = {
  * Heurística simple pero robusta:
  *   - low:  <4 cores, <8GB, o GPU Intel HD legacy (HD Graphics 2xxx-5xxx)
  *   - high: >=8 cores, >=16GB, y GPU Nvidia/AMD dedicada
- *   - medium: cualquier otra combinación
+ *   - medium: cualquier otra combinación (incluye móviles modernos)
+ *
+ * IMPORTANTE para móviles: antes forzábamos todos los móviles a 'low',
+ * lo que desactivaba el GPU delegate de MediaPipe Hands → tracking
+ * lentísimo en CPU → el gesto nunca se detectaba. Ahora los móviles
+ * modernos (Apple GPU, Adreno 6+, Mali-G7x+) caen a 'medium' que
+ * usa GPU delegate y es mucho más rápido.
  */
 export function detectPerformanceTier(): PerformanceTier {
   const cores = navigator.hardwareConcurrency ?? 4;
@@ -148,7 +154,16 @@ export function detectPerformanceTier(): PerformanceTier {
                          /intel.*hd graphics 5\d{3}/.test(gpuString);
   const hasIntelModern = /intel.*uhd|intel.*iris|intel.*arc/.test(gpuString);
   const hasDedicatedGpu = /nvidia|radeon|amd|geforce|rtx|gtx|rx [0-9]/.test(gpuString);
+
+  // Detección de móviles modernos (Apple A12+ / Snapdragon 845+ / Exynos 9810+)
+  // Apple GPU = todos los iPhones desde XS (A12 Bionic)
+  // Adreno 6xx+ = Snapdragon 845+ (2018+)
+  // Mali-G7x/G6x = Exynos 9810+ / MediaTek Dimensity
   const isMobileGpu = /mali|adreno|powervr|apple gpu/.test(gpuString);
+  const isModernMobileGpu = /apple gpu/.test(gpuString) ||
+                            /adreno [6789]/.test(gpuString) ||
+                            /mali-g[6789]/.test(gpuString) ||
+                            /mali-g7[0-9]/.test(gpuString);
 
   // Decisiones
   if (hasIntelLegacy || cores < 4 || mem < 4) {
@@ -156,6 +171,11 @@ export function detectPerformanceTier(): PerformanceTier {
   }
   if ((hasDedicatedGpu || hasIntelModern) && cores >= 8 && mem >= 16) {
     return 'high';
+  }
+  // Móvil moderno → medium (GPU delegate ON, 320x240 video, 2 manos)
+  // Móvil viejo → low (CPU delegate, 240x180 video, 1 mano)
+  if (isModernMobileGpu) {
+    return 'medium';
   }
   if (isMobileGpu) {
     return 'low';
