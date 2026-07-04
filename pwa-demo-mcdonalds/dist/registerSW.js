@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/mcdonalds-3d/sw.js', { scope: '/mcdonalds-3d/' })})}

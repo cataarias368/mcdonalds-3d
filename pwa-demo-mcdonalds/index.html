@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFC72C" />
+    <!-- Forzar GPU de alto rendimiento en laptops con doble GPU (Intel HD + NVIDIA/AMD) -->
+    <meta name="gpu-preference" content="high-performance" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <title>McDonald's 3D - Demo</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #111;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        color: #fff;
+        touch-action: none;
+        overscroll-behavior: none;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #scene-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      /* Pantalla de carga */
+      #loader {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(135deg, #DA291C 0%, #FFC72C 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        transition: opacity 0.6s ease;
+      }
+      #loader.hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .loader-logo {
+        font-size: 3.5rem;
+        font-weight: 900;
+        color: #fff;
+        text-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        margin-bottom: 1rem;
+        letter-spacing: -2px;
+      }
+      .loader-logo span {
+        color: #FFC72C;
+      }
+      .loader-spinner {
+        width: 48px;
+        height: 48px;
+        border: 4px solid rgba(255,255,255,0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      .loader-text {
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        color: rgba(255,255,255,0.9);
+        text-align: center;
+        padding: 0 2rem;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      /* Botón de inicio */
+      #start-screen {
+        position: fixed;
+        inset: 0;
+        background: rgba(17,17,17,0.92);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        z-index: 900;
+        transition: opacity 0.4s ease;
+      }
+      #start-screen.hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .start-card {
+        max-width: 480px;
+        background: linear-gradient(180deg, #1f1f1f 0%, #2a2a2a 100%);
+        border: 1px solid rgba(255,199,44,0.25);
+        border-radius: 18px;
+        padding: 2rem 1.5rem;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      }
+      .start-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(90deg, #FFC72C, #fff);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .start-sub {
+        font-size: 0.85rem;
+        color: #aaa;
+        margin-bottom: 1.5rem;
+        line-height: 1.4;
+      }
+      .start-steps {
+        text-align: left;
+        font-size: 0.85rem;
+        color: #ccc;
+        margin: 1rem 0;
+        padding: 0.8rem 1rem;
+        background: rgba(255,255,255,0.04);
+        border-radius: 10px;
+        line-height: 1.7;
+      }
+      .start-steps b { color: #FFC72C; }
+      #start-btn {
+        background: linear-gradient(90deg, #DA291C, #FFC72C);
+        color: #fff;
+        font-weight: 700;
+        font-size: 1rem;
+        padding: 0.9rem 2rem;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        margin-top: 0.5rem;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        box-shadow: 0 8px 24px rgba(218,41,28,0.4);
+      }
+      #start-btn:active {
+        transform: scale(0.96);
+      }
+      /* Instrucciones iniciales overlay */
+      #instructions {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0,0,0,0.75);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        padding: 1rem 1.5rem;
+        border-radius: 14px;
+        font-size: 0.95rem;
+        text-align: center;
+        max-width: 90%;
+        z-index: 700;
+        transition: opacity 0.5s ease;
+        border: 1px solid rgba(255,199,44,0.4);
+        pointer-events: none;
+      }
+      #instructions.hide {
+        opacity: 0;
+      }
+      #instructions .emoji {
+        font-size: 1.6rem;
+        display: block;
+        margin-bottom: 0.4rem;
+      }
+      /* Indicador de cámara */
+      #cam-indicator {
+        position: fixed;
+        top: max(12px, env(safe-area-inset-top));
+        right: max(12px, env(safe-area-inset-right));
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        border-radius: 20px;
+        font-size: 0.7rem;
+        z-index: 800;
+        border: 1px solid rgba(255,255,255,0.1);
+      }
+      #cam-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #ff3b30;
+        box-shadow: 0 0 8px rgba(255,59,48,0.7);
+        transition: all 0.3s ease;
+      }
+      #cam-dot.active {
+        background: #34c759;
+        box-shadow: 0 0 8px rgba(52,199,89,0.7);
+      }
+      #cam-label {
+        color: #fff;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+      }
+      /* Botón de recalibración */
+      #calibrate-btn {
+        position: fixed;
+        bottom: max(20px, env(safe-area-inset-bottom));
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.7);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 2px solid rgba(255,199,44,0.6);
+        color: #FFC72C;
+        font-size: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 800;
+        transition: transform 0.15s ease, background 0.2s ease;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+      }
+      #calibrate-btn:active {
+        transform: translateX(-50%) scale(0.92);
+        background: rgba(255,199,44,0.2);
+      }
+      /* Mini vista de cámara (debug) */
+      #cam-preview {
+        position: fixed;
+        bottom: max(90px, env(safe-area-inset-bottom));
+        right: max(12px, env(safe-area-inset-right));
+        width: 120px;
+        height: 90px;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.2);
+        background: #000;
+        z-index: 800;
+        display: none;
+      }
+      #cam-preview.visible {
+        display: block;
+      }
+      #cam-preview video, #cam-preview canvas {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1);
+      }
+      /* Popup de salida */
+      #exit-popup {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.7);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 950;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
+      #exit-popup.visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .popup-card {
+        background: linear-gradient(180deg, #1f1f1f 0%, #2a2a2a 100%);
+        border: 1px solid rgba(255,199,44,0.35);
+        border-radius: 18px;
+        padding: 1.8rem 1.5rem;
+        max-width: 360px;
+        width: 88%;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        transform: scale(0.9);
+        transition: transform 0.25s ease;
+      }
+      #exit-popup.visible .popup-card {
+        transform: scale(1);
+      }
+      .popup-icon {
+        font-size: 2.2rem;
+        margin-bottom: 0.5rem;
+      }
+      .popup-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: #fff;
+      }
+      .popup-sub {
+        font-size: 0.8rem;
+        color: #aaa;
+        margin-bottom: 1.3rem;
+      }
+      .popup-actions {
+        display: flex;
+        gap: 0.7rem;
+        justify-content: center;
+      }
+      .popup-btn {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        border: none;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: transform 0.15s ease, opacity 0.2s ease;
+      }
+      .popup-btn:active {
+        transform: scale(0.95);
+      }
+      .popup-btn.yes {
+        background: linear-gradient(90deg, #DA291C, #ff5a4d);
+        color: #fff;
+      }
+      .popup-btn.no {
+        background: rgba(255,255,255,0.1);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,0.2);
+      }
+      /* Pantalla final */
+      #end-screen {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(135deg, #DA291C 0%, #FFC72C 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 990;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.6s ease;
+        text-align: center;
+        padding: 2rem;
+      }
+      #end-screen.visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .end-title {
+        font-size: 2rem;
+        font-weight: 900;
+        color: #fff;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      }
+      .end-sub {
+        font-size: 1rem;
+        color: rgba(255,255,255,0.9);
+        margin-bottom: 2rem;
+      }
+      #end-restart {
+        background: #fff;
+        color: #DA291C;
+        font-weight: 800;
+        font-size: 1rem;
+        padding: 0.9rem 2rem;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      }
+      /* Footer */
+      #footer {
+        position: fixed;
+        bottom: max(6px, env(safe-area-inset-bottom));
+        left: max(12px, env(safe-area-inset-left));
+        font-size: 0.65rem;
+        color: rgba(255,255,255,0.5);
+        z-index: 700;
+        pointer-events: none;
+      }
+      /* Toast */
+      #toast {
+        position: fixed;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        background: rgba(0,0,0,0.85);
+        color: #fff;
+        padding: 0.6rem 1.1rem;
+        border-radius: 10px;
+        font-size: 0.8rem;
+        z-index: 850;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+        border: 1px solid rgba(255,199,44,0.3);
+        max-width: 80%;
+        text-align: center;
+      }
+      #toast.visible {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      /* Joystick táctil (movimiento) */
+      #joystick {
+        position: fixed;
+        bottom: max(28px, env(safe-area-inset-bottom));
+        left: max(28px, env(safe-area-inset-left));
+        width: 130px;
+        height: 130px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.35);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 2px solid rgba(255,199,44,0.35);
+        z-index: 800;
+        display: none; /* se muestra solo después de Comenzar */
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      #joystick.visible { display: block; }
+      #joystick-base {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+      }
+      #joystick-knob {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #FFC72C 0%, #DA291C 100%);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+        transform: translate(-50%, -50%);
+        transition: transform 0.06s ease-out;
+        pointer-events: none;
+      }
+      /* Indicador desktop (WASD) */
+      #key-hint {
+        position: fixed;
+        bottom: max(20px, env(safe-area-inset-bottom));
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.55);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        padding: 0.5rem 1rem;
+        border-radius: 10px;
+        font-size: 0.75rem;
+        color: rgba(255,255,255,0.85);
+        z-index: 800;
+        display: none;
+        border: 1px solid rgba(255,199,44,0.25);
+        white-space: nowrap;
+      }
+      #key-hint.visible { display: block; }
+      #key-hint b { color: #FFC72C; }
+
+      /* Botones flotantes de altura (mobile) */
+      #height-controls {
+        position: fixed;
+        bottom: max(28px, env(safe-area-inset-bottom));
+        right: max(28px, env(safe-area-inset-right));
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 800;
+      }
+      #height-controls button {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 2px solid rgba(255,199,44,0.5);
+        color: #FFC72C;
+        font-size: 1.6rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        padding: 0;
+        transition: transform 0.12s ease, background 0.2s ease;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: manipulation;
+      }
+      #height-controls button:active {
+        transform: scale(0.9);
+        background: rgba(255,199,44,0.25);
+      }
+
+      /* === Indicador FPS + Modo Performance === */
+      #perf-indicator {
+        position: fixed;
+        top: max(12px, env(safe-area-inset-top));
+        right: max(12px, env(safe-area-inset-right));
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+        z-index: 870;
+        pointer-events: auto;
+      }
+      #fps-badge {
+        background: rgba(0,0,0,0.7);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        border-radius: 8px;
+        padding: 4px 8px;
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 11px;
+        color: #34c759;
+        font-weight: 700;
+        border: 1px solid rgba(255,255,255,0.15);
+        pointer-events: none;
+      }
+      #fps-badge.warn { color: #FFC72C; border-color: rgba(255,199,44,0.5); }
+      #fps-badge.bad  { color: #ff3b30; border-color: rgba(255,59,48,0.5); }
+      #perf-btn {
+        background: rgba(0,0,0,0.75);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        border: 1px solid rgba(255,199,44,0.5);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #FFC72C;
+        cursor: pointer;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        letter-spacing: 0.3px;
+      }
+      #perf-btn:active { transform: scale(0.95); }
+      #perf-btn.low { color: #ff7a7a; border-color: rgba(255,122,122,0.5); }
+      #perf-btn.high { color: #7aff9b; border-color: rgba(122,255,155,0.5); }
+
+      /* Popup de selección de performance */
+      #perf-popup {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.75);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 980;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
+      #perf-popup.visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .perf-card {
+        background: linear-gradient(180deg, #1f1f1f 0%, #2a2a2a 100%);
+        border: 1px solid rgba(255,199,44,0.35);
+        border-radius: 18px;
+        padding: 1.5rem;
+        max-width: 360px;
+        width: 88%;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      }
+      .perf-card h3 {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #FFC72C;
+        margin-bottom: 0.4rem;
+      }
+      .perf-card p {
+        font-size: 0.78rem;
+        color: #aaa;
+        margin-bottom: 1rem;
+        line-height: 1.4;
+      }
+      .perf-options {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .perf-option {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 10px;
+        padding: 0.7rem;
+        cursor: pointer;
+        text-align: left;
+        transition: border 0.15s ease, background 0.15s ease;
+      }
+      .perf-option:hover { background: rgba(255,199,44,0.08); }
+      .perf-option.active {
+        border-color: #FFC72C;
+        background: rgba(255,199,44,0.12);
+      }
+      .perf-option .opt-title {
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 2px;
+      }
+      .perf-option .opt-desc {
+        font-size: 0.72rem;
+        color: #999;
+      }
+      .perf-option .opt-tag {
+        display: inline-block;
+        margin-top: 4px;
+        font-size: 0.65rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: rgba(52,199,89,0.15);
+        color: #34c759;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene-canvas"></canvas>
+
+      <!-- Pantalla de carga -->
+      <div id="loader">
+        <div class="loader-logo">Mc<span>D</span></div>
+        <div class="loader-spinner"></div>
+        <div class="loader-text" id="loader-text">Inicializando experiencia 3D...</div>
+      </div>
+
+      <!-- Pantalla de inicio (permiso cámara) -->
+      <div id="start-screen" class="hide">
+        <div class="start-card">
+          <div class="start-title">McDonald's 3D Experience</div>
+          <div class="start-sub">Demo para inversores &middot; Nexus Engine</div>
+          <div class="start-steps">
+            <b>1.</b> Permite el acceso a tu cámara frontal<br/>
+            <b>2.</b> <b>Girá la cabeza a los lados</b> para hacer girar la cámara<br/>
+            <b>3.</b> <b>Bajá la cabeza</b> para caminar adelante · <b>Subila</b> para retroceder<br/>
+            <b>4.</b> <b>Centrá la cabeza</b> para detener todo (giro y caminata)<br/>
+            <b>5.</b> Joystick (mobile) o WASD/flechas (PC) también para caminar<br/>
+            <b>6.</b> ✌️ <b>Mano derecha</b> con índice+medio → cursor en pantalla<br/>
+            <b>7.</b> 👌 <b>Agregá el pulgar</b> (gesto OK) apuntando a un objeto → menú de hamburguesas y bebidas<br/>
+            <b>8.</b> 👌 <b>Agregá el pulgar</b> con el menú abierto → lo cierra
+          </div>
+          <button id="start-btn">Comenzar experiencia</button>
+        </div>
+      </div>
+
+      <!-- Instrucciones iniciales -->
+      <div id="instructions" class="hide">
+        <span class="emoji">👀🚶</span>
+        <b>Girá la cabeza</b> a los lados para mirar · <b>Bajá/Subila</b> para caminar.<br/>
+        <b>Centrá la cabeza</b> para detener todo. Joystick/WASD también caminan.
+      </div>
+
+      <!-- Indicador de cámara -->
+      <div id="cam-indicator">
+        <div id="cam-dot"></div>
+        <div id="cam-label">CAM</div>
+      </div>
+
+      <!-- === Indicador FPS + Botón Modo Performance === -->
+      <div id="perf-indicator">
+        <div id="fps-badge" title="FPS de renderizado">-- FPS</div>
+        <button id="perf-btn" title="Cambiar modo de performance">⚙️ MODO: AUTO</button>
+      </div>
+
+      <!-- === Popup de selección de performance === -->
+      <div id="perf-popup">
+        <div class="perf-card">
+          <h3>⚙️ Modo de Performance</h3>
+          <p>Elegí el balance entre calidad visual y fluidez. Si la app va lenta, probá "Rendimiento".</p>
+          <div class="perf-options">
+            <div class="perf-option" data-tier="low">
+              <div class="opt-title">🚀 Rendimiento (PCs antiguos)</div>
+              <div class="opt-desc">Sin sombras · sin antialias · tracking 15fps · solo 1 mano. Ideal para i3/i5 con gráfica Intel HD.</div>
+              <span class="opt-tag">Máxima velocidad</span>
+            </div>
+            <div class="perf-option" data-tier="medium">
+              <div class="opt-title">⚖️ Equilibrado</div>
+              <div class="opt-desc">Sombras básicas · sin antialias · tracking 20fps · 2 manos. Para la mayoría de las PCs.</div>
+              <span class="opt-tag">Recomendado</span>
+            </div>
+            <div class="perf-option" data-tier="high">
+              <div class="opt-title">✨ Calidad</div>
+              <div class="opt-desc">Sombras suaves · antialias · tracking 30fps · 2 manos. Solo para PCs gamer.</div>
+              <span class="opt-tag">Máxima calidad</span>
+            </div>
+            <div class="perf-option" data-tier="auto">
+              <div class="opt-title">🤖 Automático</div>
+              <div class="opt-desc">Detecta el hardware y elige el mejor modo. Vuelve a evaluar en cada visita.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview de cámara (debug) -->
+      <div id="cam-preview">
+        <video id="cam-video" autoplay playsinline muted></video>
+        <canvas id="cam-overlay"></canvas>
+      </div>
+
+      <!-- Botón recalibración -->
+      <button id="calibrate-btn" title="Recalibrar centro" aria-label="Recalibrar centro">⚪</button>
+
+      <!-- Joystick táctil para moverse (mobile) -->
+      <div id="joystick">
+        <div id="joystick-base"></div>
+        <div id="joystick-knob"></div>
+      </div>
+
+      <!-- Hint de teclas (desktop) -->
+      <div id="key-hint"><b>WASD</b> mover &middot; <b>+/-</b> altura &middot; <b>P</b> coords &middot; <b>T</b> reset &middot; <b>⚪</b> recalibrar</div>
+
+      <!-- Botones flotantes de altura (touch/mobile) -->
+      <div id="height-controls">
+        <button id="height-up" aria-label="Subir cámara">＋</button>
+        <button id="height-down" aria-label="Bajar cámara">－</button>
+      </div>
+
+      <!-- Toast -->
+      <div id="toast"></div>
+
+      <!-- Popup de salida -->
+      <div id="exit-popup">
+        <div class="popup-card">
+          <div class="popup-icon">🚪</div>
+          <div class="popup-title">¿Quieres salir del restaurante?</div>
+          <div class="popup-sub">Estás mirando hacia la puerta principal</div>
+          <div class="popup-actions">
+            <button class="popup-btn yes" id="exit-yes">Sí</button>
+            <button class="popup-btn no" id="exit-no">No</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pantalla final -->
+      <div id="end-screen">
+        <div class="end-title">¡Gracias por probar la demo!</div>
+        <div class="end-sub">Nexus Engine &middot; Control facial 3D</div>
+        <button id="end-restart">Volver a entrar</button>
+      </div>
+
+      <!-- Footer -->
+      <div id="footer">Demo para inversores – Nexus Engine</div>
+    </div>
+
+    <!-- MediaPipe Tasks Vision se carga como paquete npm (vite lo bundlea).
+         Comparte WASM runtime entre FaceLandmarker y HandLandmarker sin colisión. -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
