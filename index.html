@@ -645,7 +645,7 @@
         font-weight: 700;
       }
     </style>
-    <script type="module" crossorigin src="/mcdonalds-3d/assets/index-DfcT3AxD.js"></script>
+    <script type="module" crossorigin src="/mcdonalds-3d/assets/index-BodX60Y0.js"></script>
   <link rel="manifest" href="/mcdonalds-3d/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/mcdonalds-3d/registerSW.js"></script></head>
   <body>
     <div id="app">
@@ -778,17 +778,5 @@
 
     <!-- MediaPipe Tasks Vision se carga como paquete npm (vite lo bundlea).
          Comparte WASM runtime entre FaceLandmarker y HandLandmarker sin colisión. -->
-
-    <!-- Escuchar mensaje del SW auto-desinstalante para forzar recarga -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.addEventListener('message', (event) => {
-          if (event.data && event.data.type === 'SW_SELF_UNINSTALL') {
-            console.log('[Page] SW auto-desinstalante pidió recarga');
-            setTimeout(() => window.location.reload(), 300);
-          }
-        });
-      }
-    </script>
   </body>
 </html>

@@ -31,9 +31,13 @@ interface MenuCategory {
 }
 
 // Precios en pesos uruguayos ($U), referenciales 2024-2025.
-// Imágenes: CDN público de McDonald's (mcdonalds.com / mcdonalds.com.uy).
-// Si la URL no carga (CORS, offline, etc.), el <img> dispara onerror
-// y dejamos un fallback con el emoji.
+// Imágenes: generadas con IA y empaquetadas localmente en /products/.
+// Cada producto mapea a la foto más cercana. Si la imagen falla
+// (muy raro, son locales), el <img> dispara onerror y mostramos emoji.
+// Base path de Vite: /mcdonalds-3d/ (GitHub Pages).
+const IMG_BASE = (import.meta.env.BASE_URL || '/') + 'products/';
+const img = (name: string) => `${IMG_BASE}${name}.png`;
+
 const MENU: MenuCategory[] = [
   {
     emoji: '🍔',
@@ -44,49 +48,49 @@ const MENU: MenuCategory[] = [
         name: 'Big Mac',
         description: 'Doble carne, queso, lechuga, pepino, salsa Big Mac',
         price: '$U 590',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Big-Mac.jpg'
+        image: img('big-mac')
       },
       {
         emoji: '🍔',
         name: 'Cuarto de Libra',
         description: 'Carne 113g, queso cheddar, cebolla, pepinillos, ketchup',
         price: '$U 650',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Quarter-Pounder-with-Cheese.jpg'
+        image: img('quarter-pounder')
       },
       {
         emoji: '🍔',
         name: 'Doble Cuarto de Libra',
         description: 'Doble carne 226g, doble queso, mostaza, cebolla, pepinillos',
         price: '$U 790',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Double-Quarter-Pounder-with-Cheese.jpg'
+        image: img('quarter-pounder')
       },
       {
         emoji: '🍔',
         name: 'Cheeseburger',
         description: 'Carne, queso cheddar, cebolla, pepinillos, mostaza, ketchup',
         price: '$U 290',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Cheeseburger.jpg'
+        image: img('cheeseburger')
       },
       {
         emoji: '🍔',
         name: 'McDouble',
         description: 'Doble carne, queso, cebolla, pepinillos, mostaza, ketchup',
         price: '$U 390',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-McDouble.jpg'
+        image: img('cheeseburger')
       },
       {
         emoji: '🍔',
         name: 'Hamburguesa Simple',
         description: 'Carne, cebolla, pepinillos, mostaza, ketchup',
         price: '$U 240',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Hamburger.jpg'
+        image: img('cheeseburger')
       },
       {
         emoji: '🐷',
         name: 'McPork Deluxe',
         description: 'Cerdo grillado, queso, lechuga, mayonesa',
         price: '$U 590',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Quarter-Pounder-with-Cheese.jpg'
+        image: img('quarter-pounder')
       }
     ]
   },
@@ -99,35 +103,35 @@ const MENU: MenuCategory[] = [
         name: 'McChicken',
         description: 'Pollo crujiente, lechuga, mayonesa',
         price: '$U 540',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-McChicken-Sandwich.jpg'
+        image: img('mcchicken')
       },
       {
         emoji: '🐟',
         name: 'Filete-O-Fish',
         description: 'Pescado rebozado, queso, salsa tártara',
         price: '$U 520',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Filet-O-Fish.jpg'
+        image: img('filet-o-fish')
       },
       {
         emoji: '🍗',
         name: 'McNuggets (6u)',
         description: '6 nuggets de pollo crujientes con salsa a elección',
         price: '$U 390',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Chicken-McNuggets-6-piece.jpg'
+        image: img('mcnuggets')
       },
       {
         emoji: '🍗',
         name: 'McNuggets (10u)',
         description: '10 nuggets de pollo crujientes con salsa a elección',
         price: '$U 590',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Chicken-McNuggets-10-piece.jpg'
+        image: img('mcnuggets')
       },
       {
         emoji: '🥪',
         name: 'Crispy Chicken Deluxe',
         description: 'Pollo crujiente, tomate, lechuga, queso, mayonesa',
         price: '$U 690',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Deluxe-Crispy-Chicken-Sandwich.jpg'
+        image: img('mcchicken')
       }
     ]
   },
@@ -140,35 +144,34 @@ const MENU: MenuCategory[] = [
         name: 'Papas Fritas Medianas',
         description: 'Las clásicas papas crujientes doradas',
         price: '$U 220',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Medium-French-Fries.jpg'
+        image: img('fries')
       },
       {
         emoji: '🍟',
         name: 'Papas Fritas Grandes',
         description: 'Porción grande de las clásicas papas crujientes',
         price: '$U 290',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Large-French-Fries.jpg'
+        image: img('fries')
       },
       {
         emoji: '🧀',
         name: 'Papas con Cheddar',
         description: 'Papas fritas con salsa de queso cheddar',
         price: '$U 320',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Medium-French-Fries.jpg'
+        image: img('fries')
       },
       {
         emoji: '🥗',
         name: 'Ensalada César',
         description: 'Lechuga, pollo grillado, croutones, parmesano, salsa césar',
-        price: '$U 490',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Caesar-Salad-with-Grilled-Chicken.jpg'
+        price: '$U 490'
       },
       {
         emoji: '🧅',
         name: 'Aros de Cebolla (6u)',
         description: '6 aros de cebolla rebozados, crujientes',
         price: '$U 290',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Medium-French-Fries.jpg'
+        image: img('fries')
       }
     ]
   },
@@ -181,35 +184,34 @@ const MENU: MenuCategory[] = [
         name: 'Coca-Cola',
         description: 'Refresco de cola. Tamaños: chico / mediano / grande',
         price: '$U 220',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Medium-Coca-Cola.jpg'
+        image: img('cola')
       },
       {
         emoji: '🥤',
         name: 'Sprite',
         description: 'Refresco de limón-lima. Sin cafeína',
         price: '$U 220',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Medium-Sprite.jpg'
+        image: img('cola')
       },
       {
         emoji: '🥤',
         name: 'Fanta Naranja',
         description: 'Refresco de naranja. Sabor cítrico',
         price: '$U 220',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Medium-Fanta-Orange.jpg'
+        image: img('cola')
       },
       {
         emoji: '💧',
         name: 'Agua Mineral',
         description: 'Agua sin gas. Botella 500ml',
-        price: '$U 180',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Dasani-Water.jpg'
+        price: '$U 180'
       },
       {
         emoji: '🧊',
         name: 'Limonada Frozen',
         description: 'Limonada frappeada con hielo. Sabores: clásica / frutilla',
         price: '$U 320',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Minute-Maid-Slushie-Lemonade.jpg'
+        image: img('cola')
       }
     ]
   },
@@ -222,28 +224,28 @@ const MENU: MenuCategory[] = [
         name: 'Café Americano',
         description: 'Café caliente, intenso. Tamaño mediano',
         price: '$U 240',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Medium-Premium-Roast-Coffee.jpg'
+        image: img('latte')
       },
       {
         emoji: '🥛',
         name: 'McCafé Latte',
         description: 'Espresso con leche vaporizada. Varios sabores',
         price: '$U 380',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Latte.jpg'
+        image: img('latte')
       },
       {
         emoji: '🍫',
         name: 'McCafé Mocha',
         description: 'Espresso, leche, chocolate vaporizado. Crema de leche',
         price: '$U 410',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Mocha.jpg'
+        image: img('latte')
       },
       {
         emoji: '☕',
         name: 'Capuchino',
         description: 'Espresso con espuma de leche cremosa',
         price: '$U 360',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Cappuccino.jpg'
+        image: img('latte')
       }
     ]
   },
@@ -256,35 +258,35 @@ const MENU: MenuCategory[] = [
         name: 'Helado de Vainilla',
         description: 'Cono de helado cremoso de vainilla',
         price: '$U 150',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Vanilla-Cone.jpg'
+        image: img('vanilla-cone')
       },
       {
         emoji: '🍦',
         name: 'Sundae Chocolate',
         description: 'Helado de vainilla con salsa de chocolate',
         price: '$U 240',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Hot-Fudge-Sundae.jpg'
+        image: img('sundae-chocolate')
       },
       {
         emoji: '🍦',
         name: 'Sundae Fresa',
         description: 'Helado de vainilla con salsa de frutilla',
         price: '$U 240',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Strawberry-Sundae.jpg'
+        image: img('sundae-chocolate')
       },
       {
         emoji: '🥧',
         name: 'Tarta de Manzana',
         description: 'Tarta caliente de manzana con canela',
         price: '$U 190',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Apple-Pie.jpg'
+        image: img('apple-pie')
       },
       {
         emoji: '🍫',
         name: 'Brownie MCFlurry',
         description: 'Helado de vainilla con trozos de brownie y salsa de chocolate',
         price: '$U 340',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-McFlurry-with-Oreo-Cookies.jpg'
+        image: img('mcflurry')
       }
     ]
   },
@@ -297,21 +299,21 @@ const MENU: MenuCategory[] = [
         name: 'McMuffin de Huevo',
         description: 'Huevo, queso cheddar, jamón, pan inglés tostado',
         price: '$U 320',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Egg-McMuffin.jpg'
+        image: img('egg-mcmuffin')
       },
       {
         emoji: '🥞',
         name: 'Hotcakes',
         description: '3 panqueques con miel y manteca',
         price: '$U 290',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Hotcakes.jpg'
+        image: img('hotcakes')
       },
       {
         emoji: '🥐',
         name: 'Medialuna',
         description: 'Medialuna de manteca caliente',
         price: '$U 120',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Egg-McMuffin.jpg'
+        image: img('egg-mcmuffin')
       }
     ]
   },
@@ -324,28 +326,28 @@ const MENU: MenuCategory[] = [
         name: 'Combo Big Mac',
         description: 'Big Mac + papas medianas + bebida mediana',
         price: '$U 890',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Big-Mac.jpg'
+        image: img('big-mac')
       },
       {
         emoji: '🍔',
         name: 'Combo Cuarto de Libra',
         description: 'Cuarto de Libra + papas medianas + bebida mediana',
         price: '$U 950',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Quarter-Pounder-with-Cheese.jpg'
+        image: img('quarter-pounder')
       },
       {
         emoji: '🐔',
         name: 'Combo McChicken',
         description: 'McChicken + papas medianas + bebida mediana',
         price: '$U 840',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-McChicken-Sandwich.jpg'
+        image: img('mcchicken')
       },
       {
         emoji: '🍗',
         name: 'Combo McNuggets 6u',
         description: '6 McNuggets + papas medianas + bebida mediana',
         price: '$U 690',
-        image: 'https://www.mcdonalds.com/is/image/content/dam/usa/nfl/nutrition/items/hero/desktop/t-mcdonalds-Chicken-McNuggets-6-piece.jpg'
+        image: img('mcnuggets')
       }
     ]
   }
