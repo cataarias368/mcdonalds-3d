@@ -51,6 +51,7 @@ export interface HandTrackerOptions {
 
 // Landmark indices for MediaPipe Hands (21 puntos por mano)
 const THUMB_TIP = 4;
+const THUMB_MCP = 2;   // base del pulgar — para medida scale-invariant
 const INDEX_TIP = 8;
 const INDEX_PIP = 6;
 const INDEX_MCP = 5;
@@ -60,16 +61,23 @@ const RING_TIP = 16;
 const RING_PIP = 14;
 const PINKY_TIP = 20;
 const PINKY_PIP = 18;
+const WRIST = 0;
 const MCP_MIDDLE = 9; // base del dedo medio — centro estable de la palma
 
-/** Distancia mínima (en coords normalizadas 0..1) entre la punta del pulgar
- *  y la base del índice para considerar el pulgar como extendido.
- *  Empírico: pulgar cerrado contra índice ≈ 0.04, pulgar abierto ≈ 0.12.
- *  Bajado a 0.06 para hacer el gesto OK más sensible (se disparaba poco). */
-const THUMB_EXTENDED_THRESHOLD = 0.06;
+/** Threshold para el pulgar: distancia(THUMB_TIP, INDEX_MCP) / tamaño de mano.
+ *  El tamaño de mano se mide como distancia(WRIST, MCP_MIDDLE) — escala
+ *  con la mano, así que el umbral es independiente de cercanía/lejanía.
+ *
+ *  Valores empíricos:
+ *   - Pulgar relajado contra el lado del índice: ratio ≈ 0.35-0.55
+ *   - Pulgar claramente extendido hacia un lado: ratio ≈ 0.75-1.1
+ *  Umbral en 0.70 = requiere movimiento deliberado, evita falsos positivos
+ *  cuando el usuario solo levanta índice+medio y el pulgar queda relajado. */
+const THUMB_EXTENDED_RATIO = 0.70;
 
-/** Throttle para enviar frames a HandLandmarker (ms) — alivia CPU. */
-const FRAME_THROTTLE_MS = 50; // ~20fps
+/** Throttle para enviar frames a HandLandmarker (ms) — alivia CPU.
+ *  Bajado a 30ms (~33fps) para que la respuesta sea más fluida. */
+const FRAME_THROTTLE_MS = 30;
 
 /**
  * URL del runtime WASM de Tasks Vision (compartido con FaceLandmarker).
@@ -104,14 +112,15 @@ export class HandTracker {
     this.onFrame = opts.onFrame;
     this.onReady = opts.onReady;
     this.onError = opts.onError;
-    // Default = high (compat con código viejo)
+    // Default = high (compat con código viejo). Throttle de mano = 33ms (30fps)
+    // para máxima fluidez — el tracker tiene un piso de 30ms igualmente.
     this.perf = opts.performance ?? {
       tier: 'high',
       antialias: true, pixelRatioMax: 2, shadowsEnabled: true, shadowMapSize: 2048,
       powerPreference: 'high-performance', numPointLights: 4, numDirectionalLights: 2,
       hemisphereLight: true, videoWidth: 480, videoHeight: 360,
       faceThrottleMs: 33, faceUseGpu: true,
-      handThrottleMs: 50, handNumHands: 2, handUseGpu: true,
+      handThrottleMs: 33, handNumHands: 2, handUseGpu: true,
       minAcceptableFps: 30
     };
   }
@@ -183,10 +192,13 @@ export class HandTracker {
       return;
     }
     const now = performance.now();
-    // Throttle según preset (low=100ms, medium=66ms, high=50ms)
+    // Throttle según preset (low=66ms, medium=50ms, high=33ms)
+    // Nota: FRAME_THROTTLE_MS (30ms) es el piso — si el preset pide más,
+    // se respeta. Si pide menos, se usa 30ms como mínimo para no quemar CPU.
+    const throttleMs = Math.max(FRAME_THROTTLE_MS, this.perf.handThrottleMs);
     if (
       this.handLandmarker &&
-      now - this.lastSendTime >= this.perf.handThrottleMs &&
+      now - this.lastSendTime >= throttleMs &&
       this.video.readyState >= 2 &&
       this.video.videoWidth > 0 &&
       this.video.currentTime !== this.lastVideoTime
@@ -249,30 +261,42 @@ export class HandTracker {
 
     // Determinar qué dedos están extendidos.
     // Un dedo está extendido si la punta está MÁS ARRIBA (y menor) que la articulación PIP.
-    // Umbral pequeño (-0.005) para ser más tolerante con dedos "casi extendidos"
+    // Umbral pequeño (+0.005) para ser más tolerante con dedos "casi extendidos"
     // que la MediaPipe a veces fluctúa.
     const indexExtended = landmarks[INDEX_TIP].y < landmarks[INDEX_PIP].y + 0.005;
     const middleExtended = landmarks[MIDDLE_TIP].y < landmarks[MIDDLE_PIP].y + 0.005;
     const ringExtended = landmarks[RING_TIP].y < landmarks[RING_PIP].y - 0.01;
     const pinkyExtended = landmarks[PINKY_TIP].y < landmarks[PINKY_PIP].y - 0.01;
 
-    // Pulgar extendido: la distancia entre la punta del pulgar (landmark 4)
-    //  y la base del índice (landmark 5) supera un umbral.
-    // Es más robusto que comparar X/Y porque el pulgar se mueve lateralmente.
+    // === Detección scale-invariant del pulgar ===
+    // Medimos el tamaño de la mano (WRIST → MCP_MIDDLE) como referencia
+    // de escala, y la distancia (THUMB_TIP → INDEX_MCP) como señal del
+    // pulgar. El ratio es independiente de si la mano está cerca o lejos
+    // de la cámara. Esto evita que el pulgar relajado se confunda con
+    // extendido (problema del threshold fijo anterior).
+    const handSize = Math.hypot(
+      landmarks[MCP_MIDDLE].x - landmarks[WRIST].x,
+      landmarks[MCP_MIDDLE].y - landmarks[WRIST].y
+    ) || 0.0001; // evitar división por 0
     const thumbDist = Math.hypot(
       landmarks[THUMB_TIP].x - landmarks[INDEX_MCP].x,
       landmarks[THUMB_TIP].y - landmarks[INDEX_MCP].y
     );
-    const thumbExtended = thumbDist > THUMB_EXTENDED_THRESHOLD;
+    const thumbRatio = thumbDist / handSize;
+    const thumbExtended = thumbRatio > THUMB_EXTENDED_RATIO;
 
     // Gesto cursor: índice + medio extendidos.
     // IMPORTANTE: no requerimos que anular/meñique estén cerrados — muchos
     // usuarios al levantar los dos dedos mantienen los otros ligeramente
     // extendidos. Antes exigíamos ambos cerrados y el punto rojo nunca
     // aparecía. Ahora basta con que índice y medio estén arriba.
+    // El pulgar NO participa aquí — solo en el gesto confirm.
     const isGestureActive = indexExtended && middleExtended;
 
-    // Gesto OK (confirmar selección): gesto cursor activo + pulgar extendido.
+    // Gesto OK (confirmar selección / abrir menú): gesto cursor + pulgar
+    // claramente extendido hacia un lado. El ratio > 0.70 exige un
+    // movimiento deliberado del pulgar, evitando que el pulgar relajado
+    // dispare el menú cuando solo se querían levantar índice+medio.
     const isConfirmActive = isGestureActive && thumbExtended;
 
     // Posición del cursor: usar landmark 9 (MCP del medio) — centro estable de la palma

@@ -65,7 +65,7 @@ const PRESETS: Record<PerformanceTier, PerformancePreset> = {
     videoHeight: 180,
     faceThrottleMs: 66,        // ~15fps
     faceUseGpu: false,         // CPU suele ser más estable en Intel HD vieja
-    handThrottleMs: 100,       // 10fps — suficiente para gestos
+    handThrottleMs: 50,        // 20fps — más responsivo que 100ms anterior
     handNumHands: 1,
     handUseGpu: false,
     minAcceptableFps: 20
@@ -84,7 +84,7 @@ const PRESETS: Record<PerformanceTier, PerformancePreset> = {
     videoHeight: 240,
     faceThrottleMs: 50,        // 20fps
     faceUseGpu: true,
-    handThrottleMs: 66,        // 15fps
+    handThrottleMs: 40,        // 25fps — más fluido que 66ms
     handNumHands: 2,
     handUseGpu: true,
     minAcceptableFps: 25
@@ -103,7 +103,7 @@ const PRESETS: Record<PerformanceTier, PerformancePreset> = {
     videoHeight: 360,
     faceThrottleMs: 33,        // 30fps
     faceUseGpu: true,
-    handThrottleMs: 50,        // 20fps
+    handThrottleMs: 33,        // 30fps — piso del tracker, máxima fluidez
     handNumHands: 2,
     handUseGpu: true,
     minAcceptableFps: 30

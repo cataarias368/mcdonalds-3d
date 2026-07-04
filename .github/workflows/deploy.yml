@@ -1,0 +1,76 @@
+# ============================================================
+# deploy.yml — Build y deploy automático a GitHub Pages
+# ------------------------------------------------------------
+# Este workflow se ejecuta en cada push a main. Compila el
+# proyecto Vite (pwa-demo-mcdonalds/) y publica el resultado
+# en GitHub Pages usando actions/deploy-pages.
+#
+# Es MÁS confiable que "serve from main branch root" porque:
+#  - Forza un rebuild limpio en cada push (sin cache del CDN)
+#  - Sube solo el dist/ compilado, no el repo entero
+#  - Reporta errores de build en la tab Actions
+#
+# IMPORTANTE: en Settings → Pages → Source, seleccionar
+# "GitHub Actions" (no "Deploy from a branch"). Esto es lo
+# único que necesita hacer el usuario manualmente.
+# ============================================================
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # permite ejecutar manualmente desde Actions tab
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un solo deploy a la vez; los nuevos cancelan los viejos
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: pwa-demo-mcdonalds/package-lock.json
+
+      - name: Install dependencies
+        working-directory: pwa-demo-mcdonalds
+        run: npm ci
+
+      - name: Build (Vite + PWA)
+        working-directory: pwa-demo-mcdonalds
+        run: npm run build
+        env:
+          # Vite base path para GitHub Pages
+          BASE_URL: /mcdonalds-3d/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pwa-demo-mcdonalds/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
