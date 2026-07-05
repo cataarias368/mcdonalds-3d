@@ -629,6 +629,34 @@ export class SceneManager {
     this.applyStartPosition();
   }
 
+  /**
+   * getYaw — devuelve el yaw actual en radianes.
+   * Útil para el TourController al capturar el inicio de una transición.
+   */
+  public getYaw(): number {
+    return this.yaw;
+  }
+
+  /**
+   * getPitch — devuelve el pitch actual en radianes.
+   */
+  public getPitch(): number {
+    return this.pitch;
+  }
+
+  /**
+   * setCameraRotation — establece yaw y pitch absolutos (radianes).
+   * Usado por TourController para mover la cámara durante el tour.
+   * No aplica suavizado — el TourController ya interpola.
+   */
+  public setCameraRotation(yaw: number, pitch: number): void {
+    this.yaw = yaw;
+    this.currentYaw = yaw;
+    this.pitch = pitch;
+    this.currentPitch = pitch;
+    this.camera.rotation.set(pitch, yaw, 0, 'YXZ');
+  }
+
   // --- Raycast para detectar puerta ---
 
   /**

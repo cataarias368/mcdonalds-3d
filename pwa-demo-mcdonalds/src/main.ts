@@ -19,12 +19,14 @@
 import { SceneManager } from './scene-manager';
 import { FaceTracker } from './face-tracker';
 import { HandTracker, type HandState } from './hand-tracker';
-import { GestureCursor } from './gesture-cursor';
+import { GestureCursor, DWELL_MS } from './gesture-cursor';
 import { ObjectInfoPopup, classifyObject } from './object-info';
 import { MenuPopup } from './menu-popup';
 import { InteractionController } from './interaction';
 import { UIController } from './ui-controller';
 import { registerPWA } from './pwa-register';
+import { VoiceController, type VoiceCommand } from './voice-controller';
+import { TourController } from './tour-controller';
 import {
   getPerformancePreset,
   savePerformanceTier,
@@ -171,6 +173,22 @@ function boot(): void {
   let popupCooldownUntil = 0;
   // Última clasificación de objeto bajo el cursor (para hover visual)
   let lastHoveringInteractable = false;
+
+  // === DWELL: tracking de tiempo sobre el mismo objeto ===
+  // Cuando el cursor está quieto sobre un interactuable, un anillo se
+  // llena en DWELL_MS. Si llega a 100% → click automático.
+  let dwellStartTime = 0;          // 0 = no hay dwell activo
+  let dwellHoveredObj: any = null; // objeto sobre el que se hace dwell
+  let dwellTriggered = false;      // ya se disparó el click en este dwell
+
+  // === MODO PRESENTACIÓN: mano levantada 3s → tour automático ===
+  let handRaisedStartTime = 0;     // 0 = mano no está levantada
+  const HAND_RAISED_THRESHOLD = 0.20; // cursorY < 0.20 = mano arriba
+  const HAND_RAISED_DURATION_MS = 3000;
+  let tourController: TourController | null = null;
+
+  // === VOZ ===
+  let voiceController: VoiceController | null = null;
 
   // Posición de la nariz en el último frame
   let currentNose = { x: 0.5, y: 0.5, detected: false };
@@ -539,6 +557,22 @@ function boot(): void {
       // 1. Actualizar visibilidad del cursor (solo visible cuando el gesto está activo)
       gestureCursor.setVisible(currentHand.isActive);
 
+      // === TOUR TICK — mantener vivo el raf del tour ===
+      if (tourController) {
+        tourController.tick();
+        // Si el tour está activo, suprimir el control de gestos para no interferir
+        if (tourController.isActive()) {
+          // Cualquier gesto del cursor → cancelar tour
+          if (currentHand.isActive) {
+            tourController.deactivate();
+          } else {
+            // Mientras dura el tour, no procesamos gestos
+            requestAnimationFrame(applyFaceControl);
+            return;
+          }
+        }
+      }
+
       if (currentHand.isActive) {
         // 2. Convertir posición normalizada (0..1) a píxeles de pantalla
         const screenX = currentHand.cursorX * window.innerWidth;
@@ -556,9 +590,16 @@ function boot(): void {
           lastHoveringInteractable = isHovering;
         }
 
-        // 4. Gesto OK (índice+medio+pulgar) → confirmar selección
+        // 4. Gesto OK (índice+medio+pulgar) → confirmar selección (instantáneo)
+        //    Este es el click "manual" — el dwell es la alternativa.
         if (currentHand.confirm) {
           gestureCursor.pulse();
+          // Cancelar cualquier dwell en curso al hacer click manual
+          gestureCursor.cancelDwell();
+          dwellStartTime = 0;
+          dwellHoveredObj = null;
+          dwellTriggered = false;
+
           const now = performance.now();
           if (now > popupCooldownUntil) {
             // Si ya hay un popup abierto → cerrarlo
@@ -579,12 +620,94 @@ function boot(): void {
             }
           }
         }
+
+        // 5. DWELL — si el cursor está sobre un interactuable, llenar anillo
+        //    y disparar click automático a los DWELL_MS.
+        if (isHovering && hitObj) {
+          if (dwellHoveredObj !== hitObj) {
+            // Cambió el objeto bajo el cursor → reiniciar dwell
+            dwellHoveredObj = hitObj;
+            dwellStartTime = performance.now();
+            dwellTriggered = false;
+            gestureCursor.startDwell();
+          } else if (!dwellTriggered) {
+            // Mismo objeto — actualizar progreso del dwell
+            const elapsed = performance.now() - dwellStartTime;
+            const progress = Math.min(1, elapsed / DWELL_MS);
+            gestureCursor.setDwellProgress(progress);
+            if (progress >= 1) {
+              // ¡Dwell completo! Disparar click automático
+              dwellTriggered = true;
+              gestureCursor.completeDwell();
+              const now = performance.now();
+              if (now > popupCooldownUntil) {
+                if (menuPopup.isOpen()) {
+                  menuPopup.hide();
+                  popupCooldownUntil = now + 400;
+                } else if (objectInfoPopup.isOpen()) {
+                  objectInfoPopup.hide();
+                  popupCooldownUntil = now + 400;
+                } else if (classification) {
+                  // Hay un objeto 3D → mostrar su info
+                  objectInfoPopup.show(
+                    classification.emoji,
+                    classification.title,
+                    classification.description
+                  );
+                  popupCooldownUntil = now + 400;
+                } else {
+                  // Sin objeto → abrir menú
+                  menuPopup.show();
+                  ui.showToast('🍔 Menú abierto (dwell)', 1800);
+                  popupCooldownUntil = now + 800;
+                }
+              }
+            }
+          }
+        } else {
+          // No hay interactuable bajo el cursor → cancelar dwell
+          if (dwellStartTime !== 0) {
+            gestureCursor.cancelDwell();
+            dwellStartTime = 0;
+            dwellHoveredObj = null;
+            dwellTriggered = false;
+          }
+        }
+
+        // 6. MODO PRESENTACIÓN — mano levantada 3s → tour automático
+        //    "Mano levantada" = cursorY < HAND_RAISED_THRESHOLD (mano arriba de la pantalla)
+        if (currentHand.cursorY < HAND_RAISED_THRESHOLD && !currentHand.confirm) {
+          if (handRaisedStartTime === 0) {
+            handRaisedStartTime = performance.now();
+          } else {
+            const raised_ms = performance.now() - handRaisedStartTime;
+            if (raised_ms >= HAND_RAISED_DURATION_MS) {
+              // ¡Activar tour!
+              if (tourController && !tourController.isActive()) {
+                tourController.activate();
+              }
+              handRaisedStartTime = 0; // reset para no re-disparar
+            }
+          }
+        } else {
+          // Mano no levantada — reset timer
+          if (handRaisedStartTime !== 0) {
+            handRaisedStartTime = 0;
+          }
+        }
       } else {
-        // Gesto inactivo — reset hover
+        // Gesto inactivo — reset hover y dwell
         if (lastHoveringInteractable) {
           gestureCursor.setHovering(false);
           lastHoveringInteractable = false;
         }
+        if (dwellStartTime !== 0) {
+          gestureCursor.cancelDwell();
+          dwellStartTime = 0;
+          dwellHoveredObj = null;
+          dwellTriggered = false;
+        }
+        handRaisedStartTime = 0;
       }
     }
 
@@ -692,11 +815,78 @@ function boot(): void {
         console.warn('⚠️ No se pudo iniciar hand tracking:', handErr);
         // Continúa sin hand tracking — la cara sigue funcionando
       }
+
+      // === TOUR CONTROLLER (modo presentación) ===
+      tourController = new TourController(scene);
+      tourController.onActivate(() => {
+        ui.showToast('🎬 Tour iniciado — disfrutá el recorrido', 2500);
+      });
+      tourController.onDeactivate(() => {
+        ui.showToast('🛑 Tour finalizado — control manual restaurado', 2000);
+      });
+
+      // === VOICE CONTROLLER (comandos por voz) ===
+      voiceController = new VoiceController({
+        onCommand: (cmd: VoiceCommand) => {
+          handleVoiceCommand(cmd);
+        },
+        onError: (err: string) => {
+          console.warn('🎤 Voice error:', err);
+        }
+      });
+      const voiceOk = voiceController.init();
+      if (voiceOk) {
+        // Iniciar reconocimiento después de un gesto del usuario (requerido por algunos browsers)
+        // Lo arrancamos automáticamente — si falla, el user puede tocar el 🎤
+        setTimeout(() => voiceController?.start(), 1000);
+        ui.showToast('🎤 Voz activa — probá decir "menú" o "abrir Big Mac"', 3500);
+      }
     } catch (err) {
       console.error('Error iniciando tracker:', err);
       ui.showToast('No se pudo iniciar la cámara', 3000);
     }
   });
+
+  /** Procesa un comando de voz reconocido. */
+  function handleVoiceCommand(cmd: VoiceCommand): void {
+    switch (cmd.type) {
+      case 'open-menu':
+        if (!menuPopup.isOpen()) {
+          menuPopup.show();
+          ui.showToast('🍔 Menú abierto por voz', 1500);
+        }
+        break;
+      case 'close-menu':
+        if (menuPopup.isOpen()) {
+          menuPopup.hide();
+          ui.showToast('✕ Menú cerrado por voz', 1200);
+        }
+        break;
+      case 'goto-product':
+        if (!menuPopup.isOpen()) {
+          menuPopup.show();
+        }
+        // Esperar a que el menú se renderice antes de hacer scroll
+        setTimeout(() => {
+          if (cmd.product && menuPopup.scrollToProduct(cmd.product)) {
+            ui.showToast(`👉 ${cmd.product}`, 1800);
+          } else {
+            ui.showToast(`❌ No encontré "${cmd.raw}"`, 2000);
+          }
+        }, 300);
+        break;
+      case 'start-tour':
+        if (tourController && !tourController.isActive()) {
+          tourController.activate();
+        }
+        break;
+      case 'stop-tour':
+        if (tourController && tourController.isActive()) {
+          tourController.deactivate();
+        }
+        break;
+    }
+  }
 
   // === FPS METER + BOTÓN MODO PERFORMANCE ===
   // Cuenta frames de rendering usando requestAnimationFrame. Muestra el FPS

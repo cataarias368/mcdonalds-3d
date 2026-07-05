@@ -22,6 +22,8 @@ interface MenuItem {
   description: string;
   price: string; // ya formateado en $U
   image?: string; // URL de la foto real (opcional)
+  /** Para combos: lista de componentes para la "explosión" visual. */
+  components?: { emoji: string; name: string; image?: string }[];
 }
 
 interface MenuCategory {
@@ -326,28 +328,48 @@ const MENU: MenuCategory[] = [
         name: 'Combo Big Mac',
         description: 'Big Mac + papas medianas + bebida mediana',
         price: '$U 890',
-        image: img('big-mac')
+        image: img('big-mac'),
+        components: [
+          { emoji: '🍔', name: 'Big Mac', image: img('big-mac') },
+          { emoji: '🍟', name: 'Papas Medianas', image: img('fries') },
+          { emoji: '🥤', name: 'Bebida Mediana', image: img('cola') }
+        ]
       },
       {
         emoji: '🍔',
         name: 'Combo Cuarto de Libra',
         description: 'Cuarto de Libra + papas medianas + bebida mediana',
         price: '$U 950',
-        image: img('quarter-pounder')
+        image: img('quarter-pounder'),
+        components: [
+          { emoji: '🍔', name: 'Cuarto de Libra', image: img('quarter-pounder') },
+          { emoji: '🍟', name: 'Papas Medianas', image: img('fries') },
+          { emoji: '🥤', name: 'Bebida Mediana', image: img('cola') }
+        ]
       },
       {
         emoji: '🐔',
         name: 'Combo McChicken',
         description: 'McChicken + papas medianas + bebida mediana',
         price: '$U 840',
-        image: img('mcchicken')
+        image: img('mcchicken'),
+        components: [
+          { emoji: '🐔', name: 'McChicken', image: img('mcchicken') },
+          { emoji: '🍟', name: 'Papas Medianas', image: img('fries') },
+          { emoji: '🥤', name: 'Bebida Mediana', image: img('cola') }
+        ]
       },
       {
         emoji: '🍗',
         name: 'Combo McNuggets 6u',
         description: '6 McNuggets + papas medianas + bebida mediana',
         price: '$U 690',
-        image: img('mcnuggets')
+        image: img('mcnuggets'),
+        components: [
+          { emoji: '🍗', name: 'McNuggets 6u', image: img('mcnuggets') },
+          { emoji: '🍟', name: 'Papas Medianas', image: img('fries') },
+          { emoji: '🥤', name: 'Bebida Mediana', image: img('cola') }
+        ]
       }
     ]
   }
@@ -463,7 +485,36 @@ export class MenuPopup {
     const categoriesHtml = MENU.map((cat, idx) => {
       const itemsHtml = cat.items
         .map(
-          (item) => `
+          (item, itemIdx) => {
+            // Botón "Ver explosión" solo para combos (items con components)
+            const explodeBtn = item.components
+              ? `<button class="combo-explode-btn" data-cat="${idx}" data-item="${itemIdx}" style="
+                  margin-top: 0.4rem;
+                  background: linear-gradient(90deg, rgba(218,41,28,0.85), rgba(255,199,44,0.85));
+                  color: #fff;
+                  border: none;
+                  border-radius: 6px;
+                  padding: 0.3rem 0.7rem;
+                  font-size: 0.72rem;
+                  font-weight: 700;
+                  cursor: pointer;
+                  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+                ">✨ Ver componentes</button>`
+              : '';
+
+            // Panel de explosión (oculto por defecto, se llena via JS)
+            const explodePanel = item.components
+              ? `<div class="combo-explode-panel" data-cat="${idx}" data-item="${itemIdx}" style="
+                  display: none;
+                  margin-top: 0.5rem;
+                  padding: 0.6rem;
+                  background: rgba(0,0,0,0.4);
+                  border-radius: 8px;
+                  border: 1px dashed rgba(255,199,44,0.4);
+                "></div>`
+              : '';
+
+            return `
         <div style="
           display: flex;
           align-items: flex-start;
@@ -472,6 +523,7 @@ export class MenuPopup {
           border-radius: 10px;
           background: rgba(255,255,255,0.04);
           margin-bottom: 0.4rem;
+          flex-wrap: wrap;
         ">
           <div class="menu-item-img-wrap" style="
             width: 56px; height: 56px;
@@ -508,9 +560,12 @@ export class MenuPopup {
             <div style="font-size: 0.74rem; color: #aaa; line-height: 1.4; margin-top: 0.15rem;">
               ${item.description}
             </div>
+            ${explodeBtn}
           </div>
+          ${explodePanel}
         </div>
-      `
+      `;
+          }
         )
         .join('');
 
@@ -610,6 +665,151 @@ export class MenuPopup {
       setTimeout(checkFallback, 50);
       setTimeout(checkFallback, 800); // re-intento para imágenes tardías
     });
+
+    // === Botones "Ver componentes" (explosión de combo) ===
+    const explodeBtns = this.card.querySelectorAll<HTMLButtonElement>('.combo-explode-btn');
+    explodeBtns.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const catIdx = parseInt(target.dataset.cat || '0', 10);
+        const itemIdx = parseInt(target.dataset.item || '0', 10);
+        this.toggleExplode(catIdx, itemIdx);
+      });
+    });
+  }
+
+  /**
+   * Alterna la vista de explosión de un combo.
+   * Cuando se abre, muestra los componentes en fila animada (cada uno
+   * "vuela" desde el centro hacia su posición, con escala 0→1).
+   * Cuando se cierra, vacía el panel.
+   */
+  private toggleExplode(catIdx: number, itemIdx: number): void {
+    const panel = this.card.querySelector<HTMLElement>(
+      `.combo-explode-panel[data-cat="${catIdx}"][data-item="${itemIdx}"]`
+    );
+    if (!panel) return;
+
+    const cat = MENU[catIdx];
+    if (!cat) return;
+    const item = cat.items[itemIdx];
+    if (!item || !item.components) return;
+
+    // Si ya está visible → cerrar
+    if (panel.style.display !== 'none') {
+      panel.style.display = 'none';
+      panel.innerHTML = '';
+      return;
+    }
+
+    // Renderizar los componentes en fila horizontal animada.
+    // Cada componente empieza con scale(0) en el centro y anima a scale(1)
+    // en su posición final, con delay escalonado (efecto "explosión").
+    const componentsHtml = item.components.map((comp, i) => {
+      const delay = i * 120; // ms — escalonado
+      return `
+        <div class="combo-component" style="
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.3rem;
+          flex: 1;
+          min-width: 70px;
+          opacity: 0;
+          transform: scale(0.3) translateY(20px);
+          animation: comboExplodeIn 0.5s ease-out ${delay}ms forwards;
+        ">
+          <div style="
+            width: 52px; height: 52px;
+            border-radius: 10px;
+            overflow: hidden;
+            background: rgba(255,199,44,0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            border: 1px solid rgba(255,199,44,0.3);
+            position: relative;
+          ">
+            ${comp.image
+              ? `<img src="${comp.image}" alt="${comp.name}" style="
+                  width: 100%; height: 100%; object-fit: cover;
+                  position: absolute; inset: 0;
+                " onerror="this.style.display='none';" />`
+              : ''}
+            <span style="font-size: 1.6rem; ${comp.image ? 'position: relative; z-index: 1;' : ''}">${comp.emoji}</span>
+          </div>
+          <span style="font-size: 0.68rem; color: #ddd; text-align: center; line-height: 1.2;">${comp.name}</span>
+        </div>
+      `;
+    }).join('');
+
+    // Conector "+" entre componentes (visual)
+    panel.innerHTML = `
+      <div style="
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      ">
+        ${componentsHtml}
+      </div>
+      <div style="
+        margin-top: 0.5rem;
+        font-size: 0.7rem;
+        color: #FFC72C;
+        text-align: center;
+        font-weight: 600;
+      ">✨ Combo desarmado en sus componentes</div>
+    `;
+    panel.style.display = 'block';
+  }
+
+  /** Sobrescribe la categoría activa — útil para "abrir [producto]" por voz. */
+  public expandCategory(catIdx: number): void {
+    const body = this.card.querySelector(
+      `.menu-cat-body[data-idx="${catIdx}"]`
+    ) as HTMLElement | null;
+    if (!body) return;
+    body.style.maxHeight = '2000px';
+    const chevron = this.card.querySelector(
+      `.menu-cat-chevron[data-idx="${catIdx}"]`
+    ) as HTMLElement | null;
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+  }
+
+  /**
+   * Busca un producto por nombre (case-insensitive, partial match)
+   * y hace scroll a él dentro del menú. Si la categoría que lo contiene
+   * está colapsada, la expande primero.
+   * @returns true si encontró el producto
+   */
+  public scrollToProduct(name: string): boolean {
+    const target = name.toLowerCase().trim();
+    for (let c = 0; c < MENU.length; c++) {
+      for (let i = 0; i < MENU[c].items.length; i++) {
+        const itemName = MENU[c].items[i].name.toLowerCase();
+        if (itemName.includes(target) || target.includes(itemName)) {
+          // Expandir la categoría
+          this.expandCategory(c);
+          // Hacer scroll al item dentro del card
+          const itemEl = this.card.querySelector<HTMLElement>(
+            `.combo-explode-panel[data-cat="${c}"][data-item="${i}"]`
+          )?.parentElement;
+          if (itemEl) {
+            itemEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Flash visual para que se note
+            itemEl.style.transition = 'background 0.3s ease';
+            const origBg = itemEl.style.background;
+            itemEl.style.background = 'rgba(255,199,44,0.25)';
+            setTimeout(() => { itemEl.style.background = origBg; }, 1200);
+          }
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /** Alterna expandir/contraer una categoría. */
